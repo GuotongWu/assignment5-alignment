@@ -1,0 +1,87 @@
+_wandb:
+    value:
+        cli_version: 0.19.11
+        m:
+            - "1": train_step
+              "6":
+                - 3
+              "7": []
+            - "1": eval_step
+              "6":
+                - 3
+              "7": []
+            - "1": train/lr
+              "5": 1
+              "6":
+                - 1
+                - 3
+              "7": []
+            - "1": train/loss
+              "5": 1
+              "6":
+                - 1
+                - 3
+              "7": []
+        python_version: 3.12.3
+        t:
+            "1":
+                - 1
+                - 5
+                - 11
+                - 30
+                - 41
+                - 49
+                - 53
+                - 55
+                - 71
+                - 95
+            "2":
+                - 1
+                - 5
+                - 11
+                - 30
+                - 41
+                - 49
+                - 53
+                - 55
+                - 71
+                - 95
+            "3":
+                - 7
+                - 13
+                - 16
+                - 23
+                - 55
+            "4": 3.12.3
+            "5": 0.19.11
+            "6": 4.51.3
+            "8":
+                - 5
+            "12": 0.19.11
+            "13": linux-x86_64
+batch_size:
+    value: 4
+epoch_num:
+    value: 1
+eval_dataset_path:
+    value: data/sft-cs336-assign5-datasets/sft-reason/val.jsonl
+eval_device:
+    value: cuda:1
+eval_interval_ratio:
+    value: 0.2
+gpu_memory_utilization:
+    value: 0.71
+gradient_accumulation_steps:
+    value: 4
+learning_rate:
+    value: 5e-05
+model_name:
+    value: Qwen3-0.6B
+select_num:
+    value: 512
+train_dataset_path:
+    value: data/sft-cs336-assign5-datasets/sft-reason/sft_gpt-oss-120b_filtered.jsonl
+train_device:
+    value: cuda:0
+warmup_ratio:
+    value: 0.03

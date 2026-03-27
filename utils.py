@@ -16,8 +16,8 @@ PROMPT_TEMPLATE_PATH = "cs336_alignment/prompts/r1_zero.prompt"
 EXTRACTED_TEMPLATE = re.compile(r"<answer>(.*?)</answer>", re.DOTALL)
 
 class MathDataset(Dataset):
-    def __init__(self, df: pd.DataFrame, select_num: int | None = None):
-        if select_num:
+    def __init__(self, df: pd.DataFrame, select_num: int = -1):
+        if select_num != -1:
             self.df = df.head(select_num)
         else:
             self.df = df
@@ -43,11 +43,10 @@ def init_wandb(args):
     wandb.login(key=wandb_key)
     
     current_time = time.strftime("%m%d_%H%M")
-    short_model_name = args.model_name.split("-")[0]
     wandb.init(
-        project="assignment-alignment",
+        project="assignment5-alignment",
         group="SFT",
-        name=f"sft-{short_model_name}-lr{args.learning_rate:.4e}-bs{args.batch_size}-{current_time}",
+        name=f"sft-{args.model_name}-lr{args.learning_rate:.4e}-bs{args.batch_size}-{current_time}",
         config=vars(args)
     )
     
@@ -61,7 +60,7 @@ def init_vllm(
     model_id: str,
     device: str,
     seed: int,
-    gpu_memory_utilization: float = 0.8
+    gpu_memory_utilization: float = 0.7
 ):
     """
     Start the inference process, here we use vLLM to hold a model on
@@ -80,24 +79,8 @@ def init_vllm(
             dtype=torch.bfloat16,
             enable_prefix_caching=True,
             gpu_memory_utilization=gpu_memory_utilization,
+            max_model_len=2048,
         )
-        
-
-# def load_policy_into_vllm_instance(policy: PreTrainedModel, llm: LLM):
-#     """
-#     Copied from https://github.com/huggingface/trl/blob/
-#         22759c820867c8659d00082ba8cf004e963873c1/trl/trainer/grpo_trainer.py#L670.
-#     """
-#     # policy.eval()
-#     # policy.tie_weights()
-#     state_dict = policy.state_dict()
-#     # cpu_state_dict = {k: v.cpu() for k, v in state_dict.items()}
-#     llm_model = llm.llm_engine.model_executor.driver_worker.model_runner.model
-#     # llm_model.load_weights(cpu_state_dict.items())
-#     llm_model.load_weights(state_dict.items())
-
-#     # policy.train()
-#     # torch.cuda.synchronize(torch.device("cuda:1"))
     
 @torch.no_grad()
 def load_policy_into_vllm_instance(policy: PreTrainedModel, llm: LLM):

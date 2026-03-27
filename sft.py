@@ -3,6 +3,7 @@ import wandb
 import argparse
 import pandas as pd
 import torch.nn.functional as F
+from tqdm.auto import tqdm
 from torch.nn.utils import clip_grad_norm_
 from torch.utils.data import DataLoader
 from transformers import AutoTokenizer, PreTrainedTokenizer, PreTrainedModel
@@ -26,7 +27,7 @@ def tokenize_prompt_and_output(
     len_concat_ids = []
     len_input_ids = []
     for pi, oi in zip(prompt_ids, output_ids):
-        concat_ids.append(torch.tensor(pi + oi, dtype=torch.int32))
+        concat_ids.append(torch.tensor(pi + oi, dtype=torch.long))
         len_input_ids.append(len(pi))
         len_concat_ids.append(len(pi) + len(oi))
     
@@ -91,15 +92,21 @@ def sft_microbatch_train_step(
 
 
 def train(args):
-    train_df = pd.read_json(args.train_dataset_path, lines=True)
+    train_df = pd.read_json(args.train_dataset_path)
     train_dataset = MathDataset(train_df, args.select_num)
     train_dataloder = DataLoader(train_dataset, shuffle=True, batch_size=args.batch_size, drop_last=True)
     
-    eval_df = pd.read_json(args.eval_dataset_path, lines=True)
+    eval_df = pd.read_json(args.eval_dataset_path)
     eval_prompts = build_prompt(eval_df["problem"].to_list())
     
     tokenizer = AutoTokenizer.from_pretrained(f"model/{args.model_name}")
-    model = AutoModelForCausalLM.from_pretrained(f"model/{args.model_name}").to(args.train_device)
+    model = AutoModelForCausalLM.from_pretrained(
+        f"model/{args.model_name}",
+        torch_dtype=torch.bfloat16,
+    ).to(args.train_device)
+    
+    model.config.use_cache = False
+    model.gradient_checkpointing_enable()
     
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
     total_steps = len(train_dataset) * args.epoch_num // (args.batch_size * args.gradient_accumulation_steps)
@@ -109,8 +116,9 @@ def train(args):
         num_training_steps=total_steps
     )
     step = 0
+    progress_bar = tqdm(range(total_steps))
     
-    llm = init_vllm(f"model/{args.model_name}", device=args.eval_device, seed=42, gpu_memory_utilization=0.8)
+    llm = init_vllm(f"model/{args.model_name}", device=args.eval_device, seed=42, gpu_memory_utilization=args.gpu_memory_utilization)
     sampling_params = SamplingParams(
         temperature=1.0, top_p=1.0, max_tokens=1024, stop=["</answer>"], include_stop_str_in_output=True
     )
@@ -126,7 +134,7 @@ def train(args):
             response_mask = tokenize_results["response_mask"]
             
             log_probs = get_response_log_probs(model, input_ids, labels)["log_probs"]
-            loss, _ = sft_microbatch_train_step(log_probs, response_mask, args.gradient_accumulation_steps)
+            loss, _ = sft_microbatch_train_step(log_probs, response_mask, args.gradient_accumulation_steps, response_mask.sum(dim=1).to(log_probs.dtype).mean())
             
             accumulated_loss += loss.item()
             
@@ -150,6 +158,8 @@ def train(args):
                     load_policy_into_vllm_instance(model, llm)
                     evaluate_vllm(llm, r1_zero_reward_fn, eval_prompts, eval_df["expected_answer"].to_list(), sampling_params, step)
 
+                progress_bar.update(1)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -158,13 +168,14 @@ if __name__ == "__main__":
     parser.add_argument("--eval_dataset_path", type=str, default="data/sft-cs336-assign5-datasets/sft-reason/val.jsonl")
     parser.add_argument("--train_device", type=str, default="cuda:0")
     parser.add_argument("--eval_device", type=str, default="cuda:1")
-    parser.add_argument("--select_num", type=int, default=128)
-    parser.add_argument("--epoch_num", type=int, default=1)
+    parser.add_argument("--select_num", type=int, default=-1)
+    parser.add_argument("--epoch_num", type=int, default=3)
     parser.add_argument("--gradient_accumulation_steps", type=int, default=4)
     parser.add_argument("--batch_size", type=int, default=4)
     parser.add_argument("--learning_rate", type=float, default=5e-5)
     parser.add_argument("--warmup_ratio", type=float, default=0.03)
-    parser.add_argument("--eval_interval_ratio", type=float, default=0.05)
+    parser.add_argument("--eval_interval_ratio", type=float, default=0.2)
+    parser.add_argument("--gpu_memory_utilization", type=float, default=0.85)
     
     args = parser.parse_args()
     
