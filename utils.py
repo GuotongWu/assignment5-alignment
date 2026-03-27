@@ -2,6 +2,7 @@ import os
 import time
 import torch
 import wandb
+import json
 import pandas as pd
 import regex as re
 from vllm import LLM, SamplingParams
@@ -113,7 +114,9 @@ def evaluate_vllm(
     prompts: list[str],
     ground_truths: list[str | int | float],
     eval_sampling_params: SamplingParams,
-    eval_step: int
+    eval_step: int,
+    args = None,
+    is_end: bool = False,
 ):
     responses = vllm_model.generate(prompts, eval_sampling_params)
     records = []
@@ -133,3 +136,8 @@ def evaluate_vllm(
         })
         
     evaluate_metrics(records, eval_step)
+
+    if is_end:
+        current_time = time.strftime("%m%d_%H%M")
+        with open(f"output/sft/{args.model_name}-lr{args.learning_rate:.4e}-bs{args.batch_size}-{current_time}.json", "w", encoding="utf-8") as f:
+            json.dump(records, f, ensure_ascii=False, indent=4)

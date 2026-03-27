@@ -160,6 +160,10 @@ def train(args):
 
                 progress_bar.update(1)
 
+    
+    evaluate_vllm(llm, r1_zero_reward_fn, eval_prompts, eval_df["expected_answer"].to_list(), sampling_params, step, args, is_end=True)
+
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -169,12 +173,12 @@ if __name__ == "__main__":
     parser.add_argument("--train_device", type=str, default="cuda:0")
     parser.add_argument("--eval_device", type=str, default="cuda:1")
     parser.add_argument("--select_num", type=int, default=-1)
-    parser.add_argument("--epoch_num", type=int, default=3)
+    parser.add_argument("--epoch_num", type=int, default=1)
     parser.add_argument("--gradient_accumulation_steps", type=int, default=4)
     parser.add_argument("--batch_size", type=int, default=4)
     parser.add_argument("--learning_rate", type=float, default=5e-5)
     parser.add_argument("--warmup_ratio", type=float, default=0.03)
-    parser.add_argument("--eval_interval_ratio", type=float, default=0.2)
+    parser.add_argument("--eval_interval_ratio", type=float, default=1)
     parser.add_argument("--gpu_memory_utilization", type=float, default=0.85)
     
     args = parser.parse_args()
