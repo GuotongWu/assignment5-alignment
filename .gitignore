@@ -3,6 +3,7 @@ uv.lock
 .DS_Store
 .claude
 model
+.env
 
 *.bin
 models/

@@ -1,19 +1,16 @@
+import os
 import json
 import regex as re
 import pandas as pd
 from vllm import LLM, SamplingParams
-from cs336_alignment.drgrpo_grader import r1_zero_reward_fn
 from typing import List, Callable
+from cs336_alignment.drgrpo_grader import r1_zero_reward_fn
+from utils import evaluate_metrics
 
 MODEL_NAME = "Qwen3-0.6B"
 VALID_DATASET_PATH = "data/sft-cs336-assign5-datasets/sft-reason/val.jsonl"
-PROMPT_TEMPLATE_PATH = "cs336_alignment/prompts/r1_zero.prompt"
 EXTRACTED_TEMPLATE = re.compile(r"<answer>(.*?)</answer>", re.DOTALL)
-    
-def build_prompt(questions):
-    with open(PROMPT_TEMPLATE_PATH, "r") as f:
-        template = f.read()
-    return [template.format(question=question) for question in questions]
+JSON_RESULTS_PATH = f"output/baseline/{MODEL_NAME}.json"
 
 def evaluate_vllm(
     vllm_model: LLM, 
@@ -38,9 +35,11 @@ def evaluate_vllm(
             "response": response.outputs[0].text,
             "reward": reward
         })
-    with open(f"output/baseline/{MODEL_NAME}_pre20.json", "w", encoding="utf-8") as f:
+    with open(JSON_RESULTS_PATH, "w", encoding="utf-8") as f:
         json.dump(records, f, ensure_ascii=False, indent=4)
         
+    
+
 def main():
     valid_dataset = pd.read_json(VALID_DATASET_PATH)
     prompts = valid_dataset["problem"].to_list()[:20]
@@ -55,4 +54,6 @@ def main():
     evaluate_vllm(llm, r1_zero_reward_fn, prompts, ground_truths, sampling_params)
 
 if __name__ == "__main__":
-    main()
+    if not os.path.exists(JSON_RESULTS_PATH):
+        main()
+    evaluate_metrics(JSON_RESULTS_PATH)

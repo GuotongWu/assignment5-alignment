@@ -210,7 +210,13 @@ def output_strs():
 
 @pytest.fixture
 def model_id():
-    return "/data/a5-alignment/models/Qwen2.5-Math-1.5B"
+    import os
+    # Use local model path if available, otherwise use HuggingFace model
+    local_path = "/data/a5-alignment/models/Qwen2.5-Math-1.5B"
+    if os.path.exists(local_path):
+        return local_path
+    # Use a small model available on HuggingFace for macOS local testing
+    return "model/Qwen3-0.6B"
 
 
 @pytest.fixture
