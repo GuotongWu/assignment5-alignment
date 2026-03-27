@@ -14,7 +14,6 @@ from transformers import PreTrainedModel
 from typing import Callable
 
 PROMPT_TEMPLATE_PATH = "cs336_alignment/prompts/r1_zero.prompt"
-EXTRACTED_TEMPLATE = re.compile(r"<answer>(.*?)</answer>", re.DOTALL)
 
 class MathDataset(Dataset):
     def __init__(self, df: pd.DataFrame, select_num: int = -1):
@@ -121,17 +120,12 @@ def evaluate_vllm(
     responses = vllm_model.generate(prompts, eval_sampling_params)
     records = []
     for response, ground_truth, prompt in zip(responses, ground_truths, prompts):
-        match = EXTRACTED_TEMPLATE.search(response.outputs[0].text)
-        if match:
-            extracted_answer = match.group(1).strip()
-        else:
-            extracted_answer = ""
-            
-        reward = reward_fn(extracted_answer, ground_truth)
+        response_text = response.outputs[0].text
+        reward = reward_fn(response_text, ground_truth)
         records.append({
             "prompt": prompt,
             "ground_truth": ground_truth,
-            "response": response.outputs[0].text,
+            "response": response_text,
             "reward": reward
         })
         
