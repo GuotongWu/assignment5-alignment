@@ -83,22 +83,27 @@ def init_vllm(
         )
         
 
-def load_policy_into_vllm_instance(policy: PreTrainedModel, llm: LLM):
-    """
-    Copied from https://github.com/huggingface/trl/blob/
-        22759c820867c8659d00082ba8cf004e963873c1/trl/trainer/grpo_trainer.py#L670.
-    """
-    # policy.eval()
-    # policy.tie_weights()
-    state_dict = policy.state_dict()
-    # cpu_state_dict = {k: v.cpu() for k, v in state_dict.items()}
-    llm_model = llm.llm_engine.model_executor.driver_worker.model_runner.model
-    # llm_model.load_weights(cpu_state_dict.items())
-    llm_model.load_weights(state_dict.items())
+# def load_policy_into_vllm_instance(policy: PreTrainedModel, llm: LLM):
+#     """
+#     Copied from https://github.com/huggingface/trl/blob/
+#         22759c820867c8659d00082ba8cf004e963873c1/trl/trainer/grpo_trainer.py#L670.
+#     """
+#     # policy.eval()
+#     # policy.tie_weights()
+#     state_dict = policy.state_dict()
+#     # cpu_state_dict = {k: v.cpu() for k, v in state_dict.items()}
+#     llm_model = llm.llm_engine.model_executor.driver_worker.model_runner.model
+#     # llm_model.load_weights(cpu_state_dict.items())
+#     llm_model.load_weights(state_dict.items())
 
-    # policy.train()
-    # torch.cuda.synchronize(torch.device("cuda:1"))
+#     # policy.train()
+#     # torch.cuda.synchronize(torch.device("cuda:1"))
     
+@torch.no_grad()
+def load_policy_into_vllm_instance(policy: PreTrainedModel, llm: LLM):
+    state_dict = policy.state_dict()
+    llm_model = llm.llm_engine.model_executor.driver_worker.model_runner.model
+    llm_model.load_weights(state_dict.items())
     
 def evaluate_metrics(records: list[dict], eval_step: int):
     df = pd.json_normalize(records)
