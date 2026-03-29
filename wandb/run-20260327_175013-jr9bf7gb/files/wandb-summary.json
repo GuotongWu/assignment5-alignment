@@ -1,0 +1,1 @@
+{"eval_step":218,"_wandb":{"runtime":712},"train/lr":0,"eval/mean_reward":0.051,"eval/form1_ans1":0.051,"_timestamp":1.774605724822857e+09,"_step":218,"train_step":218,"_runtime":711.704476408,"train/loss":0.38134765625,"eval/form1_ans0":0.0628,"eval/form0_ans0":0.8862}

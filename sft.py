@@ -178,7 +178,7 @@ if __name__ == "__main__":
     parser.add_argument("--batch_size", type=int, default=4)
     parser.add_argument("--learning_rate", type=float, default=5e-5)
     parser.add_argument("--warmup_ratio", type=float, default=0.03)
-    parser.add_argument("--eval_interval_ratio", type=float, default=1)
+    parser.add_argument("--eval_interval_ratio", type=float, default=0.1)
     parser.add_argument("--gpu_memory_utilization", type=float, default=0.85)
     
     args = parser.parse_args()
