@@ -92,7 +92,10 @@ def sft_microbatch_train_step(
 
 
 def train(args):
-    train_df = pd.read_json(args.train_dataset_path)
+    if args.filter:
+        train_df = pd.read_json(args.filter_train_dataset_path)
+    else:
+        train_df = pd.read_json(args.train_dataset_path)
     train_dataset = MathDataset(train_df, args.select_num)
     train_dataloder = DataLoader(train_dataset, shuffle=True, batch_size=args.batch_size, drop_last=True)
     
@@ -168,7 +171,8 @@ def train(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_name", type=str, default="Qwen3-0.6B")
-    parser.add_argument("--train_dataset_path", type=str, default="data/sft-cs336-assign5-datasets/sft-reason/sft_gpt-oss-120b_filtered.jsonl")
+    parser.add_argument("--train_dataset_path", type=str, default="data/sft-cs336-assign5-datasets/sft-reason/sft_gpt-oss-120b.jsonl")
+    parser.add_argument("--filtered_train_dataset_path", type=str, default="data/sft-cs336-assign5-datasets/sft-reason/sft_gpt-oss-120b_filtered.jsonl")
     parser.add_argument("--eval_dataset_path", type=str, default="data/sft-cs336-assign5-datasets/sft-reason/val.jsonl")
     parser.add_argument("--train_device", type=str, default="cuda:0")
     parser.add_argument("--eval_device", type=str, default="cuda:1")
@@ -180,6 +184,7 @@ if __name__ == "__main__":
     parser.add_argument("--warmup_ratio", type=float, default=0.03)
     parser.add_argument("--eval_interval_ratio", type=float, default=0.1)
     parser.add_argument("--gpu_memory_utilization", type=float, default=0.85)
+    parser.add_argument("--no_filter", action="store_false", dest="filter")
     
     args = parser.parse_args()
     
