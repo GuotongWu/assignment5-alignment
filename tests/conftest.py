@@ -1,3 +1,16 @@
+import sys
+from unittest.mock import MagicMock
+
+# Mock vllm before any imports to avoid Bus error on macOS
+class MockVLLM:
+    pass
+
+sys.modules['vllm'] = MockVLLM()
+sys.modules['vllm'].LLM = MagicMock()
+sys.modules['vllm'].SamplingParams = MagicMock()
+sys.modules['vllm.model_executor'] = MagicMock()
+sys.modules['vllm.model_executor'].set_random_seed = MagicMock()
+
 import hashlib
 import os
 import pickle
