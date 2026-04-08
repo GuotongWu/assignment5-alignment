@@ -4,7 +4,8 @@ import torch
 import wandb
 import json
 import pandas as pd
-import regex as re
+import torch.nn.functional as F
+from torch.nn.utils.rnn import pad_sequence
 from vllm import LLM, SamplingParams
 from unittest.mock import patch
 from dotenv import load_dotenv
@@ -12,6 +13,7 @@ from torch.utils.data import Dataset
 from vllm.model_executor import set_random_seed as vllm_set_random_seed
 from transformers import PreTrainedModel
 from typing import Callable
+from transformers import AutoTokenizer, PreTrainedTokenizer, PreTrainedModel
 
 PROMPT_TEMPLATE_PATH = "cs336_alignment/prompts/r1_zero.prompt"
 
@@ -37,24 +39,37 @@ def build_prompt(raw_prompts):
         template = f.read()
     return [template.format(question=pi) for pi in raw_prompts]
   
-def init_wandb(args):
+def init_wandb(group_type, **kwargs):
     load_dotenv()
     wandb_key = os.getenv("WANDB_API_KEY")
     wandb.login(key=wandb_key)
     
     current_time = time.strftime("%m%d_%H%M")
-    wandb.init(
-        project="assignment5-alignment",
-        group="SFT",
-        name=f"sft-{args.model_name}-lr{args.learning_rate:.4e}-bs{args.batch_size}-{current_time}",
-        config=vars(args)
-    )
     
-    wandb.define_metric("train_step")
-    wandb.define_metric("eval_step")
-    
-    wandb.define_metric("train/*", step_metric="train_step")
-    wandb.define_metric("eval/*", step_metric="eval_step")
+    if group_type == "SFT":
+        wandb.init(
+            project="assignment5-alignment",
+            group="SFT",
+            name=f"sft-{kwargs['model_name']}-lr{kwargs['learning_rate']:.4e}-bs{kwargs['batch_size']}-{current_time}",
+            config=kwargs
+        )
+        wandb.define_metric("train_step")
+        wandb.define_metric("eval_step")
+        
+        wandb.define_metric("train/*", step_metric="train_step")
+        wandb.define_metric("eval/*", step_metric="eval_step")
+    elif group_type == "GRPO":
+        wandb.init(
+            project="assignment5-alignment",
+            group="GRPO",
+            name=f"grpo-{kwargs['model_name']}-lr{kwargs['learning_rate']:.4e}-{kwargs['loss_type']}-bs{kwargs['train_batch_size']}-{current_time}",
+            config=kwargs
+        )
+        wandb.define_metric("rollout_step")
+        wandb.define_metric("train_step")
+        
+        wandb.define_metric("rollout/*", step_metric="rollout_step")
+        wandb.define_metric("train/*", step_metric="train_step")
     
 def init_vllm(
     model_id: str,
@@ -135,3 +150,56 @@ def evaluate_vllm(
         current_time = time.strftime("%m%d_%H%M")
         with open(f"output/sft/{args.model_name}-lr{args.learning_rate:.4e}-bs{args.batch_size}-{current_time}.json", "w", encoding="utf-8") as f:
             json.dump(records, f, ensure_ascii=False, indent=4)
+            
+
+def compute_entropy(logits: torch.Tensor)->torch.Tensor:
+    new_logits = torch.softmax(logits, dim=-1)
+    logsumexp_logits = torch.logsumexp(logits, dim=-1, keepdim=True)
+    return -torch.sum(new_logits * (logits - logsumexp_logits), dim=-1)
+       
+def tokenize_prompt_and_output(
+    prompt_strs: list[str],
+    output_strs: list[str],
+    tokenizer: PreTrainedTokenizer,
+    device: str
+) -> dict[str, torch.Tensor]:
+    prompt_ids = tokenizer(prompt_strs, padding=False, truncation=False)["input_ids"]
+    output_ids = tokenizer(output_strs, padding=False, truncation=False)["input_ids"]
+    
+    concat_ids = []
+    len_concat_ids = []
+    len_input_ids = []
+    for pi, oi in zip(prompt_ids, output_ids):
+        concat_ids.append(torch.tensor(pi + oi, dtype=torch.long))
+        len_input_ids.append(len(pi))
+        len_concat_ids.append(len(pi) + len(oi))
+    
+    concat_ids = pad_sequence(concat_ids, batch_first=True, padding_value=tokenizer.pad_token_id, padding_side='right').to(device)
+    len_concat_ids = torch.tensor(len_concat_ids, dtype=torch.int32).to(device)
+    len_input_ids = torch.tensor(len_input_ids, dtype=torch.int32).to(device)
+    
+    raw_mask = torch.arange(concat_ids.shape[1]).to(device)
+    response_mask = ((len_input_ids.unsqueeze(dim=-1) <= raw_mask) & ( raw_mask < len_concat_ids.unsqueeze(dim=-1)))
+    
+    return {
+        "input_ids": concat_ids[..., :-1],
+        "labels": concat_ids[..., 1:],
+        "response_mask": response_mask[...,1:]
+    }
+    
+    
+def get_response_log_probs(
+    model: PreTrainedModel,
+    input_ids: torch.Tensor,
+    labels: torch.Tensor,
+    return_token_entropy: bool = False
+)->dict[str, torch.Tensor]:
+    token_entropy = None
+    logits = model(input_ids).logits
+    if return_token_entropy:
+        token_entropy = compute_entropy(logits)
+    new_logits = F.log_softmax(logits, dim=-1)
+    return {
+        "log_probs": torch.gather(new_logits, dim=-1, index=labels.unsqueeze(dim=-1)).squeeze(dim=-1),
+        "token_entropy": token_entropy
+    }
