@@ -32,8 +32,8 @@ def compute_group_normalized_rewards(
         advantages /= std_rewards + advantage_eps
     
     return (
-        torch.tensor(advantages.flatten()),
-        torch.tensor(raw_rewards.flatten()),
+        torch.tensor(advantages.flatten(), dtype=torch.float32),
+        torch.tensor(raw_rewards.flatten(), dtype=torch.float32),
         {
             "mean_rewards": raw_rewards.mean().item(),
             "std_rewards": raw_rewards.std().item(),
@@ -47,6 +47,7 @@ def compute_naive_policy_gradient_loss(
     raw_rewards_or_advantages: torch.Tensor,
     policy_log_probs: torch.Tensor
 ) -> torch.Tensor:
+    raw_rewards_or_advantages = raw_rewards_or_advantages.unsqueeze(dim=-1)
     return - raw_rewards_or_advantages * policy_log_probs
     
 
@@ -56,6 +57,7 @@ def compute_grpo_clip_loss(
     old_log_probs: torch.Tensor,
     cliprange: float,
 ) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
+    advantages = advantages.unsqueeze(dim=-1)
     ratio_log_probs = torch.exp(policy_log_probs - old_log_probs)
     lhs = ratio_log_probs * advantages
     rhs = torch.clip(ratio_log_probs, 1 - cliprange, 1 + cliprange) * advantages
@@ -132,7 +134,8 @@ def grpo_train_loop(
     train_batch_size: int = 256,
     gradient_accumulation_steps: int = 128,
     gpu_memory_utilization: float = 0.85,
-    loss_type: Literal["no_baseline", "reinforce_with_baseline", "grpo_clip"] = "reinforce_with_baseline",
+    loss_type: str = "grpo_clip",
+    # loss_type: Literal["no_baseline", "reinforce_with_baseline", "grpo_clip"] = "reinforce_with_baseline",
     use_std_normalization: bool = True,
     train_device: str = "cuda:0",
     inference_device: str = "cuda:1",
@@ -201,7 +204,7 @@ def grpo_train_loop(
             "rollout/std_rewards": metadata["std_rewards"],
             "rollout/max_rewards": metadata["max_rewards"],
             "rollout/min_rewards": metadata["min_rewards"],
-        }, step=step)
+        })
         
         tokenize_results = tokenize_prompt_and_output(repeated_prompts, rollout_responses, tokenizer, device=train_device)
         
@@ -240,15 +243,17 @@ def grpo_train_loop(
                 mean_loss, metadata = grpo_microbatch_train_step(micro_policy_log_probs, micro_response_mask, gradient_accumulation_steps, loss_type, micro_raw_rewards, micro_advantages, micro_old_log_probs, cliprange=cliprange)
                 
                 wandb.log(data={
-                    "train/token_entropy": micro_token_entropy,
-                }, step=global_opt_step)
+                    "train_step": global_opt_step,
+                    "train/token_entropy": micro_token_entropy.float().mean().item(),
+                })
                 
                 if len(metadata) > 0:
                     wandb.log(data={
-                        "train/mean_loss": mean_loss,
-                        "train/clip_ratio": metadata["clip_ratio"],
-                        "train/approx_kl": metadata["approx_kl"]
-                    }, step=global_opt_step)
+                        "train_step": global_opt_step,
+                        "train/mean_loss": mean_loss.float().item(),
+                        "train/clip_ratio": metadata["clip_ratio"].float().item(),
+                        "train/approx_kl": metadata["approx_kl"].float().item()
+                    })
                     
                 global_opt_step += 1
                 progress_bar.update(n=1)

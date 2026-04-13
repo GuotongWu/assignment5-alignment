@@ -1,0 +1,48 @@
+{
+  "os": "Linux-5.15.0-78-generic-x86_64-with-glibc2.35",
+  "python": "CPython 3.12.3",
+  "startedAt": "2026-04-13T01:35:51.775026Z",
+  "program": "/root/assignment5-alignment/grpo.py",
+  "codePath": "grpo.py",
+  "git": {
+    "remote": "git@github.com:GuotongWu/assignment5-alignment.git",
+    "commit": "9753df86b07a14eb7f1c0859a9e4ffaff235a500"
+  },
+  "email": "wuguotongswjtu@gmail.com",
+  "root": "/root/assignment5-alignment",
+  "host": "autodl-container-cf8d458da4-1b998bbe",
+  "executable": "/root/assignment5-alignment/.venv/bin/python",
+  "codePathLocal": "grpo.py",
+  "cpu_count": 64,
+  "cpu_count_logical": 128,
+  "gpu": "NVIDIA GeForce RTX 4090",
+  "gpu_count": 2,
+  "disk": {
+    "/": {
+      "total": "32212254720",
+      "used": "24954019840"
+    }
+  },
+  "memory": {
+    "total": "1081810518016"
+  },
+  "cpu": {
+    "count": 64,
+    "countLogical": 128
+  },
+  "gpu_nvidia": [
+    {
+      "name": "NVIDIA GeForce RTX 4090",
+      "memoryTotal": "25757220864",
+      "cudaCores": 16384,
+      "architecture": "Ada"
+    },
+    {
+      "name": "NVIDIA GeForce RTX 4090",
+      "memoryTotal": "25757220864",
+      "cudaCores": 16384,
+      "architecture": "Ada"
+    }
+  ],
+  "cudaVersion": "13.0"
+}
