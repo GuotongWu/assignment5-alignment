@@ -7,7 +7,8 @@ import torch
 from torch import Tensor
 from torch.utils.data import Dataset
 from transformers import PreTrainedTokenizerBase
-from sft import tokenize_prompt_and_output, compute_entropy, get_response_log_probs, masked_normalize, sft_microbatch_train_step
+from utils import compute_entropy
+from sft import tokenize_prompt_and_output, get_response_log_probs, masked_normalize, sft_microbatch_train_step
 from grpo import compute_group_normalized_rewards, compute_naive_policy_gradient_loss, compute_grpo_clip_loss, compute_policy_gradient_loss
 from grpo import masked_mean, grpo_microbatch_train_step
 
