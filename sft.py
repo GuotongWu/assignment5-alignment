@@ -2,69 +2,18 @@ import torch
 import wandb
 import argparse
 import pandas as pd
-import torch.nn.functional as F
 from tqdm.auto import tqdm
 from torch.nn.utils import clip_grad_norm_
 from torch.utils.data import DataLoader
 from transformers import AutoTokenizer, PreTrainedTokenizer, PreTrainedModel
 from transformers import AutoModelForCausalLM
 from transformers import get_cosine_schedule_with_warmup
-from torch.nn.utils.rnn import pad_sequence
 from vllm import SamplingParams
 from utils import MathDataset, init_vllm, init_wandb, build_prompt, evaluate_vllm, load_policy_into_vllm_instance
+from utils import tokenize_prompt_and_output, get_response_log_probs
 from cs336_alignment.drgrpo_grader import r1_zero_reward_fn
 
-def tokenize_prompt_and_output(
-    prompt_strs: list[str],
-    output_strs: list[str],
-    tokenizer: PreTrainedTokenizer,
-    device: str
-) -> dict[str, torch.Tensor]:
-    prompt_ids = tokenizer(prompt_strs, padding=False, truncation=False)["input_ids"]
-    output_ids = tokenizer(output_strs, padding=False, truncation=False)["input_ids"]
     
-    concat_ids = []
-    len_concat_ids = []
-    len_input_ids = []
-    for pi, oi in zip(prompt_ids, output_ids):
-        concat_ids.append(torch.tensor(pi + oi, dtype=torch.long))
-        len_input_ids.append(len(pi))
-        len_concat_ids.append(len(pi) + len(oi))
-    
-    concat_ids = pad_sequence(concat_ids, batch_first=True, padding_value=tokenizer.pad_token_id, padding_side='right').to(device)
-    len_concat_ids = torch.tensor(len_concat_ids, dtype=torch.int32).to(device)
-    len_input_ids = torch.tensor(len_input_ids, dtype=torch.int32).to(device)
-    
-    raw_mask = torch.arange(concat_ids.shape[1]).to(device)
-    response_mask = ((len_input_ids.unsqueeze(dim=-1) <= raw_mask) & ( raw_mask < len_concat_ids.unsqueeze(dim=-1)))
-    
-    return {
-        "input_ids": concat_ids[..., :-1],
-        "labels": concat_ids[..., 1:],
-        "response_mask": response_mask[...,1:]
-    }
-    
-def compute_entropy(logits: torch.Tensor)->torch.Tensor:
-    new_logits = torch.softmax(logits, dim=-1)
-    logsumexp_logits = torch.logsumexp(logits, dim=-1, keepdim=True)
-    return -torch.sum(new_logits * (logits - logsumexp_logits), dim=-1)
-
-def get_response_log_probs(
-    model: PreTrainedModel,
-    input_ids: torch.Tensor,
-    labels: torch.Tensor,
-    return_token_entropy: bool = False
-)->dict[str, torch.Tensor]:
-    token_entropy = None
-    logits = model(input_ids).logits
-    if return_token_entropy:
-        token_entropy = compute_entropy(logits)
-    new_logits = F.log_softmax(logits, dim=-1)
-    return {
-        "log_probs": torch.gather(new_logits, dim=-1, index=labels.unsqueeze(dim=-1)).squeeze(dim=-1),
-        "token_entropy": token_entropy
-    }
-
 def masked_normalize(
     tensor: torch.Tensor,
     mask: torch.Tensor,
@@ -188,5 +137,5 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     
-    init_wandb(args)
+    init_wandb("SFT", **vars(args))
     train(args)
