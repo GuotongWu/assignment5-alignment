@@ -93,7 +93,7 @@ def sft_microbatch_train_step(
 
 def train(args):
     if args.filter:
-        train_df = pd.read_json(args.filter_train_dataset_path)
+        train_df = pd.read_json(args.filtered_train_dataset_path)
     else:
         train_df = pd.read_json(args.train_dataset_path)
     train_dataset = MathDataset(train_df, args.select_num)
